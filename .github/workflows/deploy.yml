@@ -114,6 +114,7 @@ jobs:
 
             cd "$DEPLOY_PATH" || { echo "ERROR: Cannot cd into $DEPLOY_PATH"; exit 1; }
             echo "Working directory: $(pwd)"
+            set -x
 
             if [ ! -f .env ] && [ -n "$SERVER_ENV_FILE_B64" ]; then
               echo "Creating .env from SERVER_ENV_FILE_B64 secret"
