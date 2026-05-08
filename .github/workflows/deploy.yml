@@ -114,7 +114,11 @@ jobs:
 
             if [ ! -f .env ] && [ -n "$SERVER_ENV_FILE_B64" ]; then
               echo "Creating .env from SERVER_ENV_FILE_B64 secret"
-              printf "%s" "$SERVER_ENV_FILE_B64" | base64 -d > .env
+              printf "%s" "$SERVER_ENV_FILE_B64" | base64 -d 2>/dev/null > .env || printf "%s" "$SERVER_ENV_FILE_B64" | base64 -D > .env
+              if [ ! -s .env ]; then
+                echo "Failed to decode SERVER_ENV_FILE_B64"
+                exit 1
+              fi
               chmod 600 .env
             fi
 
