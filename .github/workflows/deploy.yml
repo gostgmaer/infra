@@ -176,9 +176,6 @@ jobs:
               exit 1
             fi
 
-            echo "Stopping old containers"
-            $COMPOSE_CMD --env-file .env down || true
-
             echo "Running: $COMPOSE_CMD --env-file .env up -d --remove-orphans"
             if $COMPOSE_CMD --env-file .env up -d --remove-orphans; then
               echo "Containers started successfully"
