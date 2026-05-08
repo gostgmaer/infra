@@ -3,6 +3,8 @@ services:
     image: traefik:v3.1
     container_name: infra-traefik
     restart: unless-stopped
+    environment:
+      - DOCKER_API_VERSION=1.41
     command:
       - --global.sendanonymoususage=false
       - --log.level=INFO
