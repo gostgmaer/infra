@@ -34,7 +34,7 @@ jobs:
             GIT_REPO_URL="${{ secrets.GIT_REPO_URL }}"
             SERVER_ENV_FILE_B64="${{ secrets.SERVER_ENV_FILE_B64 }}"
             if [ -z "$DEPLOY_PATH" ]; then
-              DEPLOY_PATH="/opt/infra"
+              DEPLOY_PATH="infra"
               echo "DEPLOY_PATH not set, defaulting to $DEPLOY_PATH"
             fi
 
@@ -94,23 +94,12 @@ jobs:
             echo "DEBUG: About to create deploy path"
             echo "DEBUG: DEPLOY_PATH is: '$DEPLOY_PATH'"
 
-            mkdir -p "$DEPLOY_PATH" 2>&1 || true
-            if [ -d "$DEPLOY_PATH" ] && [ -w "$DEPLOY_PATH" ]; then
-              echo "Using deploy path: $DEPLOY_PATH"
+            if mkdir -p "$DEPLOY_PATH" 2>&1; then
+              echo "Deploy path ready: $DEPLOY_PATH"
             else
-              echo "mkdir failed or no write permission for $DEPLOY_PATH, attempting with sudo"
-              if command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
-                echo "Creating with sudo"
-                sudo mkdir -p "$DEPLOY_PATH" || { echo "sudo mkdir failed"; exit 1; }
-                sudo chown -R "$USER:$USER" "$DEPLOY_PATH" || { echo "sudo chown failed"; exit 1; }
-                echo "Deploy path created with sudo"
-              else
-                echo "Permission denied for DEPLOY_PATH=$DEPLOY_PATH"
-                echo "Please run this on server first:"
-                echo "  sudo mkdir -p $DEPLOY_PATH"
-                echo "  sudo chown -R \$USER:\$USER $DEPLOY_PATH"
-                exit 1
-              fi
+              echo "ERROR: Cannot create $DEPLOY_PATH"
+              echo "Check permissions or set DEPLOY_PATH to a writable directory in GitHub Secrets"
+              exit 1
             fi
 
             echo "Checking for existing git repo at $DEPLOY_PATH/.git"
