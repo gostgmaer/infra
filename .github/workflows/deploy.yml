@@ -90,7 +90,19 @@ jobs:
               echo "DEPLOY_BRANCH not set, auto-selected $DEPLOY_BRANCH"
             fi
 
-            mkdir -p "$DEPLOY_PATH"
+            if mkdir -p "$DEPLOY_PATH" >/dev/null 2>&1; then
+              echo "Using deploy path: $DEPLOY_PATH"
+            else
+              if command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
+                echo "No write permission for $DEPLOY_PATH, creating with sudo"
+                sudo mkdir -p "$DEPLOY_PATH"
+                sudo chown -R "$USER":"$USER" "$DEPLOY_PATH"
+              else
+                echo "Permission denied for DEPLOY_PATH=$DEPLOY_PATH"
+                echo "Set DEPLOY_PATH to a writable directory like /home/$USER/infra, or grant passwordless sudo"
+                exit 1
+              fi
+            fi
 
             if [ ! -d "$DEPLOY_PATH/.git" ]; then
               echo "First deploy: cloning repository"
