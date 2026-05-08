@@ -103,7 +103,14 @@ jobs:
             fi
 
             echo "Checking for existing git repo at $DEPLOY_PATH/.git"
-            if [ ! -d "$DEPLOY_PATH/.git" ]; then
+            if [ -d "$DEPLOY_PATH/.git" ]; then
+              echo "Repository already exists"
+            else
+              if [ -d "$DEPLOY_PATH" ] && [ "$(ls -A "$DEPLOY_PATH" 2>/dev/null)" ]; then
+                echo "Directory exists but is not a git repo (stale from failed deploy), cleaning up"
+                rm -rf "$DEPLOY_PATH"
+                mkdir -p "$DEPLOY_PATH"
+              fi
               echo "First deploy: cloning repository from $GIT_REPO_URL branch $DEPLOY_BRANCH"
               if git clone --branch "$DEPLOY_BRANCH" "$GIT_REPO_URL" "$DEPLOY_PATH"; then
                 echo "Repository cloned successfully"
@@ -111,8 +118,6 @@ jobs:
                 echo "Failed to clone repository"
                 exit 1
               fi
-            else
-              echo "Repository already exists"
             fi
 
             cd "$DEPLOY_PATH"
