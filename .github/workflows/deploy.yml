@@ -1,0 +1,105 @@
+name: Deploy Infra Stack
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: infra-deploy-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run remote deployment over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          script_stop: true
+          script: |
+            set -e
+
+            DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
+            DEPLOY_BRANCH="${{ secrets.DEPLOY_BRANCH || 'main' }}"
+            GIT_REPO_URL="${{ secrets.GIT_REPO_URL }}"
+
+            if ! command -v git >/dev/null 2>&1; then
+              echo "git is not installed on target server"
+              exit 1
+            fi
+
+            if ! command -v docker >/dev/null 2>&1; then
+              echo "docker is not installed on target server"
+              exit 1
+            fi
+
+            if docker compose version >/dev/null 2>&1; then
+              COMPOSE_CMD="docker compose"
+            elif command -v docker-compose >/dev/null 2>&1; then
+              COMPOSE_CMD="docker-compose"
+            else
+              echo "Docker Compose is not installed on target server"
+              exit 1
+            fi
+
+            ARCH="$(uname -m)"
+            case "$ARCH" in
+              aarch64|arm64)
+                export DOCKER_DEFAULT_PLATFORM=linux/arm64
+                ;;
+              x86_64|amd64)
+                export DOCKER_DEFAULT_PLATFORM=linux/amd64
+                ;;
+              *)
+                echo "Unsupported architecture: $ARCH"
+                exit 1
+                ;;
+            esac
+
+            echo "Server architecture: $ARCH"
+            echo "Using DOCKER_DEFAULT_PLATFORM=$DOCKER_DEFAULT_PLATFORM"
+
+            if [ -z "$DEPLOY_PATH" ]; then
+              echo "DEPLOY_PATH secret is missing"
+              exit 1
+            fi
+
+            if [ -z "$GIT_REPO_URL" ]; then
+              echo "GIT_REPO_URL secret is missing"
+              exit 1
+            fi
+
+            mkdir -p "$DEPLOY_PATH"
+
+            if [ ! -d "$DEPLOY_PATH/.git" ]; then
+              echo "First deploy: cloning repository"
+              git clone --branch "$DEPLOY_BRANCH" "$GIT_REPO_URL" "$DEPLOY_PATH"
+            fi
+
+            cd "$DEPLOY_PATH"
+
+            echo "Updating code from git"
+            git fetch origin "$DEPLOY_BRANCH"
+            git checkout "$DEPLOY_BRANCH"
+            git pull --ff-only origin "$DEPLOY_BRANCH"
+
+            if [ ! -f .env ]; then
+              echo "Missing .env on server at $DEPLOY_PATH/.env"
+              echo "Create it once from .env.example before using CI/CD"
+              exit 1
+            fi
+
+            echo "Deploying containers"
+            $COMPOSE_CMD --env-file .env pull
+            $COMPOSE_CMD --env-file .env up -d --remove-orphans
+            docker image prune -f
