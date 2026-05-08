@@ -53,8 +53,8 @@ Add these in GitHub:
 - `SSH_USER`: SSH user (for example `ubuntu`)
 - `SSH_PRIVATE_KEY`: private key content (PEM) used by Actions
 - `SSH_PORT`: SSH port, usually `22`
-- `DEPLOY_PATH`: absolute server path, for example `/opt/infra`
-- `DEPLOY_BRANCH`: branch to deploy, usually `main`
+- `DEPLOY_PATH`: absolute server path (optional, defaults to `/opt/infra`)
+- `DEPLOY_BRANCH`: branch to deploy (optional, auto-selects `main` then `master`)
 - `GIT_REPO_URL`: clone URL reachable by server (SSH or HTTPS)
 
 Notes:
@@ -75,10 +75,15 @@ Use SSH deploy key on the server:
 On each push to `main`, workflow does:
 1. SSH to server
 2. Clone repo if first run
-3. `git fetch` + `git pull --ff-only`
-4. `docker compose --env-file .env pull`
-5. `docker compose --env-file .env up -d --remove-orphans`
-6. prune dangling images
+3. Uses branch from `DEPLOY_BRANCH`, or auto-selects `main`/`master`
+4. `git fetch` + `git pull --ff-only`
+5. `docker compose --env-file .env pull`
+6. `docker compose --env-file .env up -d --remove-orphans`
+7. prune dangling images
+
+Default behavior when optional secrets are missing:
+1. `DEPLOY_PATH` -> `/opt/infra`
+2. `DEPLOY_BRANCH` -> `main` if present, else `master`
 
 It also validates:
 1. git exists on server

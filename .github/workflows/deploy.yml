@@ -32,8 +32,9 @@ jobs:
             DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
             DEPLOY_BRANCH="${{ secrets.DEPLOY_BRANCH }}"
             GIT_REPO_URL="${{ secrets.GIT_REPO_URL }}"
-            if [ -z "$DEPLOY_BRANCH" ]; then
-              DEPLOY_BRANCH="main"
+            if [ -z "$DEPLOY_PATH" ]; then
+              DEPLOY_PATH="/opt/infra"
+              echo "DEPLOY_PATH not set, defaulting to $DEPLOY_PATH"
             fi
 
             if command -v git >/dev/null 2>&1; then
@@ -60,30 +61,33 @@ jobs:
             fi
 
             ARCH="$(uname -m)"
-            case "$ARCH" in
-              aarch64|arm64)
-                export DOCKER_DEFAULT_PLATFORM=linux/arm64
-                ;;
-              x86_64|amd64)
-                export DOCKER_DEFAULT_PLATFORM=linux/amd64
-                ;;
-              *)
-                echo "Unsupported architecture: $ARCH"
-                exit 1
-                ;;
-            esac
+            if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+              export DOCKER_DEFAULT_PLATFORM=linux/arm64
+            elif [ "$ARCH" = "x86_64" ] || [ "$ARCH" = "amd64" ]; then
+              export DOCKER_DEFAULT_PLATFORM=linux/amd64
+            else
+              echo "Unsupported architecture: $ARCH"
+              exit 1
+            fi
 
             echo "Server architecture: $ARCH"
             echo "Using DOCKER_DEFAULT_PLATFORM=$DOCKER_DEFAULT_PLATFORM"
 
-            if [ -z "$DEPLOY_PATH" ]; then
-              echo "DEPLOY_PATH secret is missing"
-              exit 1
-            fi
-
             if [ -z "$GIT_REPO_URL" ]; then
               echo "GIT_REPO_URL secret is missing"
               exit 1
+            fi
+
+            if [ -z "$DEPLOY_BRANCH" ]; then
+              if git ls-remote --exit-code --heads "$GIT_REPO_URL" main >/dev/null 2>&1; then
+                DEPLOY_BRANCH="main"
+              elif git ls-remote --exit-code --heads "$GIT_REPO_URL" master >/dev/null 2>&1; then
+                DEPLOY_BRANCH="master"
+              else
+                echo "Neither main nor master branch exists in $GIT_REPO_URL"
+                exit 1
+              fi
+              echo "DEPLOY_BRANCH not set, auto-selected $DEPLOY_BRANCH"
             fi
 
             mkdir -p "$DEPLOY_PATH"
