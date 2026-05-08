@@ -30,15 +30,22 @@ jobs:
             set -e
 
             DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
-            DEPLOY_BRANCH="${{ secrets.DEPLOY_BRANCH || 'main' }}"
+            DEPLOY_BRANCH="${{ secrets.DEPLOY_BRANCH }}"
             GIT_REPO_URL="${{ secrets.GIT_REPO_URL }}"
+            if [ -z "$DEPLOY_BRANCH" ]; then
+              DEPLOY_BRANCH="main"
+            fi
 
-            if ! command -v git >/dev/null 2>&1; then
+            if command -v git >/dev/null 2>&1; then
+              :
+            else
               echo "git is not installed on target server"
               exit 1
             fi
 
-            if ! command -v docker >/dev/null 2>&1; then
+            if command -v docker >/dev/null 2>&1; then
+              :
+            else
               echo "docker is not installed on target server"
               exit 1
             fi
