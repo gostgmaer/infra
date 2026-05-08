@@ -34,7 +34,7 @@ jobs:
             GIT_REPO_URL="${{ secrets.GIT_REPO_URL }}"
             SERVER_ENV_FILE_B64="${{ secrets.SERVER_ENV_FILE_B64 }}"
             if [ -z "$DEPLOY_PATH" ]; then
-              DEPLOY_PATH="infra"
+              DEPLOY_PATH="$HOME/infra"
               echo "DEPLOY_PATH not set, defaulting to $DEPLOY_PATH"
             fi
 
@@ -91,16 +91,8 @@ jobs:
               echo "DEPLOY_BRANCH not set, auto-selected $DEPLOY_BRANCH"
             fi
 
-            echo "DEBUG: About to create deploy path"
-            echo "DEBUG: DEPLOY_PATH is: '$DEPLOY_PATH'"
-
-            if mkdir -p "$DEPLOY_PATH" 2>&1; then
-              echo "Deploy path ready: $DEPLOY_PATH"
-            else
-              echo "ERROR: Cannot create $DEPLOY_PATH"
-              echo "Check permissions or set DEPLOY_PATH to a writable directory in GitHub Secrets"
-              exit 1
-            fi
+            mkdir -p "$DEPLOY_PATH" || { echo "ERROR: Cannot create $DEPLOY_PATH"; exit 1; }
+            echo "Deploy path ready: $DEPLOY_PATH"
 
             echo "Checking for existing git repo at $DEPLOY_PATH/.git"
             if [ -d "$DEPLOY_PATH/.git" ]; then
@@ -120,7 +112,8 @@ jobs:
               fi
             fi
 
-            cd "$DEPLOY_PATH"
+            cd "$DEPLOY_PATH" || { echo "ERROR: Cannot cd into $DEPLOY_PATH"; exit 1; }
+            echo "Working directory: $(pwd)"
 
             if [ ! -f .env ] && [ -n "$SERVER_ENV_FILE_B64" ]; then
               echo "Creating .env from SERVER_ENV_FILE_B64 secret"
@@ -173,21 +166,15 @@ jobs:
             fi
 
             echo "Deploying containers"
-            echo "Running: $COMPOSE_CMD --env-file .env pull"
-            if $COMPOSE_CMD --env-file .env pull; then
-              echo "Pull successful"
-            else
-              echo "Pull failed"
-              exit 1
-            fi
+            echo "Pulling latest images"
+            $COMPOSE_CMD --env-file .env pull || { echo "Pull failed"; exit 1; }
 
-            echo "Running: $COMPOSE_CMD --env-file .env up -d --remove-orphans"
-            if $COMPOSE_CMD --env-file .env up -d --remove-orphans; then
-              echo "Containers started successfully"
-            else
-              echo "Container startup failed"
-              exit 1
-            fi
+            echo "Stopping existing containers"
+            $COMPOSE_CMD --env-file .env down || true
+
+            echo "Starting containers"
+            $COMPOSE_CMD --env-file .env up -d --remove-orphans || { echo "Container startup failed"; exit 1; }
+            echo "Containers started successfully"
 
             echo "Pruning dangling images"
             docker image prune -f
