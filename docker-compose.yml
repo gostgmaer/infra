@@ -38,7 +38,8 @@ services:
       - traefik.http.routers.traefik-dashboard.tls=true
       - traefik.http.routers.traefik-dashboard.tls.certresolver=le
       - traefik.http.routers.traefik-dashboard.service=api@internal
-      - traefik.http.routers.traefik-dashboard.middlewares=security-headers@file
+      - traefik.http.routers.traefik-dashboard.middlewares=security-headers@file,dashboard-auth@docker
+      - traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_USERS}
 
   portainer:
     image: portainer/portainer-ce:lts
