@@ -178,3 +178,46 @@ jobs:
 
             echo "Pruning dangling images"
             docker image prune -f
+
+            echo "--- Health Checks ---"
+
+            PORTAINER_SUBDOMAIN=$(grep PORTAINER_SUBDOMAIN .env | cut -d= -f2)
+            TRAEFIK_SUBDOMAIN=$(grep TRAEFIK_DASHBOARD_SUBDOMAIN .env | cut -d= -f2)
+            BASE_DOMAIN=$(grep BASE_DOMAIN .env | cut -d= -f2)
+
+            sleep 5
+
+            check_container() {
+              NAME=$1
+              STATUS=$(docker inspect --format='{{.State.Status}}' "$NAME" 2>/dev/null || echo "not found")
+              if [ "$STATUS" = "running" ]; then
+                echo "OK  container $NAME is running"
+              else
+                echo "FAIL container $NAME status: $STATUS"
+                HEALTH_FAILED=1
+              fi
+            }
+
+            check_url() {
+              LABEL=$1
+              URL=$2
+              CODE=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 10 "$URL" || echo "000")
+              if [ "$CODE" = "200" ] || [ "$CODE" = "301" ] || [ "$CODE" = "302" ] || [ "$CODE" = "303" ]; then
+                echo "OK  $LABEL responded $CODE"
+              else
+                echo "WARN $LABEL responded $CODE (DNS/TLS may still be propagating)"
+              fi
+            }
+
+            HEALTH_FAILED=0
+            check_container "infra-traefik"
+            check_container "infra-portainer"
+            check_url "Portainer" "https://${PORTAINER_SUBDOMAIN}.${BASE_DOMAIN}"
+            check_url "Traefik dashboard" "https://${TRAEFIK_SUBDOMAIN}.${BASE_DOMAIN}"
+
+            if [ "$HEALTH_FAILED" = "1" ]; then
+              echo "One or more containers failed health check"
+              exit 1
+            fi
+
+            echo "--- All health checks passed ---"
