@@ -32,6 +32,7 @@ jobs:
             DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
             DEPLOY_BRANCH="${{ secrets.DEPLOY_BRANCH }}"
             GIT_REPO_URL="${{ secrets.GIT_REPO_URL }}"
+            SERVER_ENV_FILE_B64="${{ secrets.SERVER_ENV_FILE_B64 }}"
             if [ -z "$DEPLOY_PATH" ]; then
               DEPLOY_PATH="/opt/infra"
               echo "DEPLOY_PATH not set, defaulting to $DEPLOY_PATH"
@@ -110,6 +111,12 @@ jobs:
             fi
 
             cd "$DEPLOY_PATH"
+
+            if [ ! -f .env ] && [ -n "$SERVER_ENV_FILE_B64" ]; then
+              echo "Creating .env from SERVER_ENV_FILE_B64 secret"
+              printf "%s" "$SERVER_ENV_FILE_B64" | base64 -d > .env
+              chmod 600 .env
+            fi
 
             echo "Updating code from git"
             git fetch origin "$DEPLOY_BRANCH"

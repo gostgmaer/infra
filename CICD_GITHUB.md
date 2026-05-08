@@ -56,10 +56,45 @@ Add these in GitHub:
 - `DEPLOY_PATH`: absolute server path (optional, defaults to `/opt/infra`)
 - `DEPLOY_BRANCH`: branch to deploy (optional, auto-selects `main` then `master`)
 - `GIT_REPO_URL`: clone URL reachable by server (SSH or HTTPS)
+- `SERVER_ENV_FILE_B64`: optional base64-encoded full `.env` content (used to auto-create `.env` on first deploy)
 
 Notes:
 - If `GIT_REPO_URL` is private via SSH, ensure the server can authenticate to GitHub (deploy key or SSH key).
 - Keep production values in server-side `.env`; do not commit them.
+
+## 2.1) How to set env variables on server
+
+Option A: set directly on server (recommended)
+
+```bash
+mkdir -p /opt/infra
+cat > /opt/infra/.env << 'EOF'
+BASE_DOMAIN=easydev.in
+PORTAINER_SUBDOMAIN=portainer
+TRAEFIK_DASHBOARD_SUBDOMAIN=domain-control
+LETSENCRYPT_EMAIL=infra@easydev.in
+TRAEFIK_NETWORK_NAME=edge
+EOF
+chmod 600 /opt/infra/.env
+```
+
+Option B: let GitHub Actions create .env automatically
+
+1. Create base64 from your local `.env`:
+
+```bash
+base64 -w 0 .env
+```
+
+2. Save that output as GitHub Secret `SERVER_ENV_FILE_B64`.
+
+3. On deploy, workflow creates `DEPLOY_PATH/.env` if missing.
+
+For Oracle Linux with older base64 where `-w` is unsupported:
+
+```bash
+base64 .env | tr -d '\n'
+```
 
 ## 3) Recommended Git Auth Pattern
 
@@ -84,6 +119,7 @@ On each push to `main`, workflow does:
 Default behavior when optional secrets are missing:
 1. `DEPLOY_PATH` -> `/opt/infra`
 2. `DEPLOY_BRANCH` -> `main` if present, else `master`
+3. `SERVER_ENV_FILE_B64` -> skipped (workflow expects existing server `.env`)
 
 It also validates:
 1. git exists on server

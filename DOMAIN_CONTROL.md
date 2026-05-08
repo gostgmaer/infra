@@ -2,7 +2,7 @@
 
 This setup gives you:
 - `https://portainer.easydev.in` for Portainer
-- `https://traefik.easydev.in` for Traefik dashboard
+- `https://domain-control.easydev.in` for Traefik dashboard
 - One central file for domain values: `.env`
 
 ## 1) Set Domain Values
@@ -22,7 +22,7 @@ Example result:
 
 Create DNS records that point to your server public IP:
 - `A` record: `portainer` -> `<YOUR_SERVER_PUBLIC_IP>`
-- `A` record: `traefik` -> `<YOUR_SERVER_PUBLIC_IP>`
+- `A` record: `domain-control` -> `<YOUR_SERVER_PUBLIC_IP>`
 
 Optional:
 - If you will expose more apps later, use wildcard DNS:
