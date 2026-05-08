@@ -105,9 +105,17 @@ jobs:
               fi
             fi
 
+            echo "Checking for existing git repo at $DEPLOY_PATH/.git"
             if [ ! -d "$DEPLOY_PATH/.git" ]; then
-              echo "First deploy: cloning repository"
-              git clone --branch "$DEPLOY_BRANCH" "$GIT_REPO_URL" "$DEPLOY_PATH"
+              echo "First deploy: cloning repository from $GIT_REPO_URL branch $DEPLOY_BRANCH"
+              if git clone --branch "$DEPLOY_BRANCH" "$GIT_REPO_URL" "$DEPLOY_PATH"; then
+                echo "Repository cloned successfully"
+              else
+                echo "Failed to clone repository"
+                exit 1
+              fi
+            else
+              echo "Repository already exists"
             fi
 
             cd "$DEPLOY_PATH"
@@ -117,23 +125,67 @@ jobs:
               printf "%s" "$SERVER_ENV_FILE_B64" | base64 -d 2>/dev/null > .env || printf "%s" "$SERVER_ENV_FILE_B64" | base64 -D > .env
               if [ ! -s .env ]; then
                 echo "Failed to decode SERVER_ENV_FILE_B64"
+                echo "SERVER_ENV_FILE_B64 length: ${#SERVER_ENV_FILE_B64}"
                 exit 1
               fi
+              echo ".env created successfully with $(wc -l < .env) lines"
               chmod 600 .env
+            else
+              if [ -f .env ]; then
+                echo ".env already exists, skipping base64 decode"
+              else
+                echo "No SERVER_ENV_FILE_B64 secret provided"
+              fi
             fi
 
             echo "Updating code from git"
-            git fetch origin "$DEPLOY_BRANCH"
-            git checkout "$DEPLOY_BRANCH"
-            git pull --ff-only origin "$DEPLOY_BRANCH"
+            echo "Fetching from origin $DEPLOY_BRANCH"
+            if git fetch origin "$DEPLOY_BRANCH"; then
+              echo "Fetch successful"
+            else
+              echo "Fetch failed"
+              exit 1
+            fi
+
+            echo "Checking out $DEPLOY_BRANCH"
+            if git checkout "$DEPLOY_BRANCH"; then
+              echo "Checkout successful"
+            else
+              echo "Checkout failed"
+              exit 1
+            fi
+
+            echo "Pulling from origin $DEPLOY_BRANCH"
+            if git pull --ff-only origin "$DEPLOY_BRANCH"; then
+              echo "Pull successful"
+            else
+              echo "Pull failed or rejected (non-ff)"
+              exit 1
+            fi
 
             if [ ! -f .env ]; then
-              echo "Missing .env on server at $DEPLOY_PATH/.env"
+              echo "ERROR: Missing .env on server at $DEPLOY_PATH/.env"
               echo "Create it once from .env.example before using CI/CD"
+              ls -la "$DEPLOY_PATH" || true
               exit 1
             fi
 
             echo "Deploying containers"
-            $COMPOSE_CMD --env-file .env pull
-            $COMPOSE_CMD --env-file .env up -d --remove-orphans
+            echo "Running: $COMPOSE_CMD --env-file .env pull"
+            if $COMPOSE_CMD --env-file .env pull; then
+              echo "Pull successful"
+            else
+              echo "Pull failed"
+              exit 1
+            fi
+
+            echo "Running: $COMPOSE_CMD --env-file .env up -d --remove-orphans"
+            if $COMPOSE_CMD --env-file .env up -d --remove-orphans; then
+              echo "Containers started successfully"
+            else
+              echo "Container startup failed"
+              exit 1
+            fi
+
+            echo "Pruning dangling images"
             docker image prune -f
